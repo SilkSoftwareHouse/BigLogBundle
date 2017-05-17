@@ -1,0 +1,30 @@
+services:
+    silksh_big_log.listener:
+            class: Silksh\BigLogBundle\EventListener\LoggerListener
+            calls:
+                - [setStorage, ['@silksh_big_log.pre_storage']]
+            tags:
+                - { name: kernel.event_subscriber }
+    silksh_big_log.db_storage:
+            class: PDO
+            factory: ['Silksh\BigLogBundle\Service\Factory\StorageFactory', createPDO]
+            arguments:
+                - '%db%'
+    silksh_big_log.raw_pre_storage:
+            class: Redis
+            factory: ['Silksh\BigLogBundle\Service\Factory\StorageFactory', createRedis]
+            arguments:
+                - '%redis_url%'
+                - '%redis_namespace%'
+    silksh_big_log.pre_storage:
+            class: Symfony\Component\Cache\Adapter\RedisAdapter
+            factory: ['Silksh\BigLogBundle\Service\Factory\StorageFactory', createRedisAdapter]
+            arguments:
+                - '%redis_url%'
+                - '%redis_namespace%'
+    silksh_big_log.logger:
+            class: Silksh\BigLogBundle\Service\LoggerService
+            arguments:
+                - '@silksh_big_log.raw_pre_storage'
+                - '@silksh_big_log.pre_storage'
+                - '@silksh_big_log.db_storage'

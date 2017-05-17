@@ -1,0 +1,19 @@
+{
+    "name" : "silksh/big-log-bundle",
+    "description" : "Symfony3 bundle to use the Redis and an SQL database to store logs.",
+    "type" : "symfony-bundle",
+    "keywords" : [
+        "symfony3 redis sql"
+    ],
+    "license" : [
+        "MIT"
+    ],
+    "require" : {
+	"symfony/cache" : "^3.1.0",
+	"ext-redis": "*",
+	"ext-pdo": "*"
+    },
+    "autoload" : {
+        "psr-4" : { "Silksh\\BigLogBundle\\" : ""}
+    }
+}

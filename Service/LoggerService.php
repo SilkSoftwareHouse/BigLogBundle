@@ -2,9 +2,9 @@
 
 namespace Silksh\BigLogBundle\Service;
 
-use BaseBundle\Helper\DictionaryTableExtractor;
 use PDO;
 use Redis;
+use Silksh\BigLogBundle\Helper\DictionaryTableExtractor;
 use Symfony\Component\Cache\Adapter\RedisAdapter;
 
 class LoggerService
@@ -84,7 +84,7 @@ class LoggerService
             return true;
         }
         $redisStatus = $this->redisHelper->getIdExtended($key);
-        if ($redisStatus[1] != DictionaryTableExtractor::NEW) {
+        if ($redisStatus[1] != DictionaryTableExtractor::GENERATED) {
             /* Record exists. Nothing to do. */
             return false;
         }

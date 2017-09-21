@@ -42,14 +42,36 @@ class Redis2dbCommand extends ContainerAwareCommand
               value VARCHAR(256) COLLATE 'latin1_bin' UNIQUE
             );
 
+           CREATE TABLE agent (
+             id INTEGER AUTO_INCREMENT PRIMARY KEY,
+             value VARCHAR(512) COLLATE 'utf8mb4_bin'
+           );
+
+           CREATE TABLE meta (
+             id INTEGER AUTO_INCREMENT PRIMARY KEY,
+             value VARCHAR(512) COLLATE 'utf8mb4_bin'
+           );
+
             CREATE TABLE log (
               id INTEGER PRIMARY KEY,
               path INTEGER REFERENCES path(id),
               query INTEGER REFERENCES query(id),
               source INTEGER REFERENCES source(id),
-              start TIMESTAMP,
+              agent INTEGER REFERENCES agent(id),
+              meta INTEGER REFERENCES meta(id),
+              start DATETIME,
               duration FLOAT
             );
+
+           -- Update from 1.0.x
+
+           -- Create table agent using code above.
+
+           ALTER TABLE log
+             ADD COLUMN agent INTEGER REFERENCES agent(id),
+             ADD COLUMN meta INTEGER REFERENCES meta(id),
+             CHANGE COLUMN start start DATETIME
+           ;
         ");
     }
 

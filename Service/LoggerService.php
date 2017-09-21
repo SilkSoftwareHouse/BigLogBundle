@@ -18,6 +18,7 @@ class LoggerService
     private $queryHelper;
     private $redisHelper;
     private $sourceHelper;
+    private $agentHelper;
 
     public function __construct(Redis $redis, RedisAdapter $redisAdapter, PDO $pdo)
     {
@@ -29,6 +30,7 @@ class LoggerService
         $this->queryHelper = new DictionaryTableExtractor($pdo, 'query');
         $this->redisHelper = new DictionaryTableExtractor($pdo, 'redis');
         $this->sourceHelper = new DictionaryTableExtractor($pdo, 'source');
+        $this->agentHelper = new DictionaryTableExtractor($pdo, 'agent');
     }
 
     private function usAsciiPercentMaker($special)
@@ -38,16 +40,6 @@ class LoggerService
             $mapper = function($x) { return urlencode(urldecode($x)); };
             $p = array_map($mapper, $p);
             return implode($special, $p);
-        };
-    }
-
-    private function usAsciiPercentMakerDouble($first, $second)
-    {
-        $mapper = $this->usAsciiPercentMaker($second);
-        return function($string) use($first, $mapper) {
-            $p = explode($first, $string);
-            $p = array_map($mapper, $p);
-            return implode($first, $p);
         };
     }
 
@@ -64,8 +56,8 @@ class LoggerService
     {
         if (!$this->stm) {
             $this->stm = $this->pdo->prepare("
-               INSERT INTO log(id, path, query, source, start, duration)
-               VALUES (:id, :path, :query, :source, :start, :duration)
+               INSERT INTO log(id, path, query, source, agent, start, duration)
+               VALUES (:id, :path, :query, :source, :agent, :start, :duration)
             ");
         }
         foreach ($params as $k => $v) {
@@ -73,6 +65,13 @@ class LoggerService
         }
         $this->stm->execute();
         return false;
+    }
+
+    private function normaliseKeys(&$d)
+    {
+        if (!array_key_exists('agent', $d)) {
+            $d['agent'] = '';
+        }
     }
 
     private function processKey($key)
@@ -88,14 +87,19 @@ class LoggerService
             /* Record exists. Nothing to do. */
             return false;
         }
+        $this->normaliseKeys($d);
         $params = array();
         $path = parse_url($d['uri'], \PHP_URL_PATH);
         $path = $this->percentUnicode($path);
         $params['path'] = $this->pathHelper->getId($path);
         $query = parse_url($d['uri'], \PHP_URL_QUERY);
         $query = $this->percentUnicode($query);
+        if (strlen($query) > 250) {
+            $query = substr($query, 0, 250) . '...';
+        }
         $params['query'] = $this->queryHelper->getId($query);
         $params['source'] = $this->sourceHelper->getId($d['ip']);
+        $params['agent'] = $this->agentHelper->getId($d['agent']);
         $params['id'] = $redisStatus[0];
         $params['duration'] = $d['stop'] - $d['start'];
         $startObj = new \DateTime('@'.(int)$d['start']);

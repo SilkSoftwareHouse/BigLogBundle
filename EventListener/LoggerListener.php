@@ -15,6 +15,7 @@ class LoggerListener implements EventSubscriberInterface
     private $start;
     private $storage;
     private $uri;
+    private $agent;
 
     private function makeKey()
     {
@@ -41,6 +42,7 @@ class LoggerListener implements EventSubscriberInterface
         $request = $event->getRequest();
         $this->uri = $request->getUri();
         $this->ip = $request->getClientIp();
+        $this->agent = $request->headers->get('User-Agent');
     }
 
     public function requestEnd(PostResponseEvent $event)
@@ -53,6 +55,7 @@ class LoggerListener implements EventSubscriberInterface
             'stop' => microtime(true),
             'uri' => $this->uri,
             'ip'  => $this->ip,
+            'agent'  => $this->agent,
         ];
         $json = json_encode($toStore);
         $key = $this->makeKey();

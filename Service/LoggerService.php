@@ -19,6 +19,7 @@ class LoggerService
     private $redisHelper;
     private $sourceHelper;
     private $agentHelper;
+    private $metaHelper;
 
     public function __construct(Redis $redis, RedisAdapter $redisAdapter, PDO $pdo)
     {
@@ -31,6 +32,7 @@ class LoggerService
         $this->redisHelper = new DictionaryTableExtractor($pdo, 'redis');
         $this->sourceHelper = new DictionaryTableExtractor($pdo, 'source');
         $this->agentHelper = new DictionaryTableExtractor($pdo, 'agent');
+        $this->metaHelper = new DictionaryTableExtractor($pdo, 'meta');
     }
 
     private function usAsciiPercentMaker($special)
@@ -56,8 +58,8 @@ class LoggerService
     {
         if (!$this->stm) {
             $this->stm = $this->pdo->prepare("
-               INSERT INTO log(id, path, query, source, agent, start, duration)
-               VALUES (:id, :path, :query, :source, :agent, :start, :duration)
+               INSERT INTO log(id, path, query, source, agent, start, duration, meta)
+               VALUES (:id, :path, :query, :source, :agent, :start, :duration, :meta)
             ");
         }
         foreach ($params as $k => $v) {
@@ -72,6 +74,11 @@ class LoggerService
         if (!array_key_exists('agent', $d)) {
             $d['agent'] = '';
         }
+        $common = array_flip(['id', 'ip', 'uri', 'agent', 'stop', 'start']);
+        $rest = array_diff_key($d, $common);
+        ksort($rest);
+        $d = array_intersect_key($d, $common);
+        $d['meta'] = json_encode((array)$rest);
     }
 
     private function processKey($key)
@@ -87,6 +94,12 @@ class LoggerService
             /* Record exists. Nothing to do. */
             return false;
         }
+        $d['id'] = $redisStatus[0];
+        $this->processRecord($d);
+    }
+
+    private function processRecord(array $d)
+    {
         $this->normaliseKeys($d);
         $params = array();
         $path = parse_url($d['uri'], \PHP_URL_PATH);
@@ -100,11 +113,25 @@ class LoggerService
         $params['query'] = $this->queryHelper->getId($query);
         $params['source'] = $this->sourceHelper->getId($d['ip']);
         $params['agent'] = $this->agentHelper->getId($d['agent']);
-        $params['id'] = $redisStatus[0];
+        $params['id'] = $d['id'];
         $params['duration'] = $d['stop'] - $d['start'];
         $startObj = new \DateTime('@'.(int)$d['start']);
         $params['start'] = $startObj->format('Y-m-d H:i:s');
+        $params['meta'] = $this->metaHelper->getId($d['meta']);
         return $this->doInsert($params);
+    }
+
+    public function importFromArray(array $input, callable $logger)
+    {
+        $processing = count($input);
+        $msg = "Processing: $processing";
+        $logger($msg);
+        $this->pdo->beginTransaction();
+        foreach ($input as $d) {
+            $d['id'] = $this->redisHelper->getId($d['id']);
+            $this->processRecord($d);
+        }
+        $this->pdo->commit();
     }
 
     public function importFromRedis($max, callable $logger)
